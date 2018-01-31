@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:aop="http://www.springframework.org/schema/aop" xmlns:task="http://www.springframework.org/schema/task" xmlns:context="http://www.springframework.org/schema/context" xsi:schemaLocation="http://www.springframework.org/schema/beans
+		    http://www.springframework.org/schema/beans/spring-beans.xsd
+		    http://www.springframework.org/schema/aop
+		    http://www.springframework.org/schema/aop/spring-aop-3.0.xsd
+		    http://www.springframework.org/schema/context
+		    http://www.springframework.org/schema/context/spring-context.xsd
+		    http://www.springframework.org/schema/task
+		    http://www.springframework.org/schema/task/spring-task-3.2.xsd">
+
+
+	<task:annotation-driven scheduler="qbScheduler" mode="proxy" />
+	<task:scheduler id="qbScheduler" pool-size="10" />
+	<!-- 消息队列生产者连接池 -->
+	<bean id="messageProducerPool" class="com.zhph.common.kafka.util.kafka.transconsistence.MessageProducerPool" destroy-method="close" />
+	<!-- 消息队列消费者连接池 -->
+	<bean id="messageConsumerPool" class="com.zhph.common.kafka.util.kafka.transconsistence.MessageConsumerPool" destroy-method="close" />
+	<!-- 日志服务 -->
+	<bean id="transMsgLogService" class="com.zhph.common.kafka.service.impl.TransMsgLogServiceImpl" />
+	<bean id="transMsgConsumerLogService" class="com.zhph.common.kafka.service.impl.TransMsgConsumerLogServiceImpl" />
+	<!-- 消息生产者实现类 -->
+	<bean id="mQTransConsistenceProducer" class="com.zhph.common.kafka.util.kafka.transconsistence.MQTransConsistenceProducerImpl">
+		<property name="transMsgLogService" ref="transMsgLogService" />
+		<property name="messageProducerPool" ref="messageProducerPool" />
+		<property name="mQTransConsistenceConsumer" ref="mQTransConsistenceConsumer" />
+		<!-- 接收消费者的确认消息（消息中不带自定义返回值）的频率，单位：毫秒 -->
+		<property name="updateMsgLogRate" value="800" />
+		<!-- 子系统前缀，如user等 -->
+		<property name="producerPrefix" value="afterLoan" />
+	</bean>
+	<!-- 消息消费者实现类 -->
+	<bean id="mQTransConsistenceConsumer" class="com.zhph.common.kafka.util.kafka.transconsistence.MQTransConsistenceConsumerImpl">
+		<property name="messageProducerPool" ref="messageProducerPool" />
+		<property name="messageConsumerPool" ref="messageConsumerPool" />
+		<property name="transMsgConsumerLogService" ref="transMsgConsumerLogService" />
+	</bean>
+
+	<!-- 定时任务 -->
+	<task:scheduled-tasks>
+		<!-- 消息生产者消息轮训发送服务 -->
+		<task:scheduled ref="mQTransConsistenceProducer" method="checkMsgLogAndSendMsg" cron="* 1 * * * ?" />
+	</task:scheduled-tasks>
+</beans>

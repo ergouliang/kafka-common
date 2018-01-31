@@ -1,0 +1,247 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.zhph.common.kafka.dao.TransMsgConsumerLogMapper">
+	<resultMap id="BaseResultMap" type="com.zhph.common.kafka.model.TransMsgConsumerLog">
+		<id column="ID" property="id" jdbcType="VARCHAR" />
+		<result column="MSG_PUBLISHER" property="msgPublisher"
+			jdbcType="VARCHAR" />
+		<result column="FIRST_TIME" property="firstTime" jdbcType="TIMESTAMP" />
+		<result column="MSG_NAME" property="msgName" jdbcType="VARCHAR" />
+		<result column="STATUS" property="status" jdbcType="CHAR" />
+		<result column="RETRY_COUNT" property="retryCount" jdbcType="INTEGER" />
+		<result column="RETRY_LIMIT" property="retryLimit" jdbcType="INTEGER" />
+		<result column="ERROR_MSG" property="errorMsg" jdbcType="VARCHAR" />
+		<result column="UPDATE_TIME" property="updateTime" jdbcType="TIMESTAMP" />
+		<result column="CONSUMER_TIME" property="consumerTime"
+			jdbcType="TIMESTAMP" />
+		<result column="CREATED_ID" property="createdId" jdbcType="VARCHAR" />
+		<result column="CALLBACK_BODY" property="callbackBody" jdbcType="VARCHAR" />
+	</resultMap>
+	<sql id="Base_Column_List">
+		ID
+		,MSG_PUBLISHER
+		,FIRST_TIME
+		,MSG_NAME
+		,STATUS
+		,RETRY_COUNT
+		,RETRY_LIMIT
+		,ERROR_MSG
+		,UPDATE_TIME
+		,CONSUMER_TIME
+		,CREATED_ID
+		,CALLBACK_BODY
+	</sql>
+
+	<select id="getByPrimaryKey" resultMap="BaseResultMap"
+		parameterType="java.lang.String">
+		select
+		<include refid="Base_Column_List" />
+		from C_TRANSMSG_CONSUMER_LOG
+		where ID = #{id,jdbcType=VARCHAR}
+	</select>
+
+	<select id="listByCondition" resultMap="BaseResultMap"
+		parameterType="com.zhph.common.kafka.model.TransMsgConsumerLog">
+		select
+		<include refid="Base_Column_List" />
+		from C_TRANSMSG_CONSUMER_LOG
+		where 1=1
+		<if test="id != null and '' != id">
+			and ID = #{id,jdbcType=VARCHAR}
+		</if>
+		<if test="msgPublisher != null and '' != msgPublisher">
+			and MSG_PUBLISHER = #{msgPublisher,jdbcType=VARCHAR}
+		</if>
+		<if test="firstTime != null">
+			and FIRST_TIME = #{firstTime,jdbcType=TIMESTAMP}
+		</if>
+		<if test="msgName != null and '' != msgName">
+			and MSG_NAME = #{msgName,jdbcType=VARCHAR}
+		</if>
+		<if test="status != null and '' != status">
+			and STATUS = #{status,jdbcType=CHAR}
+		</if>
+		<if test="retryCount != null and '' != retryCount">
+			and RETRY_COUNT = #{retryCount,jdbcType=INTEGER}
+		</if>
+		<if test="retryLimit != null and '' != retryLimit">
+			and RETRY_LIMIT = #{retryLimit,jdbcType=INTEGER}
+		</if>
+		<if test="errorMsg != null and '' != errorMsg">
+			and ERROR_MSG = #{errorMsg,jdbcType=VARCHAR}
+		</if>
+		<if test="updateTime != null">
+			and UPDATE_TIME = #{updateTime,jdbcType=TIMESTAMP}
+		</if>
+		<if test="consumerTime != null">
+			and CONSUMER_TIME = #{consumerTime,jdbcType=TIMESTAMP}
+		</if>
+		<if test="createdId != null and '' != createdId">
+			and CREATED_ID = #{createdId,jdbcType=VARCHAR}
+		</if>
+		<!-- <if test="orderFields != null and '' != orderFields"> order by ${orderFields} 
+			${order} </if> -->
+	</select>
+
+	<delete id="deleteByKey" parameterType="java.lang.String">
+		delete from
+		C_TRANSMSG_CONSUMER_LOG
+		where ID in (#{id,jdbcType=VARCHAR})
+	</delete>
+
+	<insert id="add" parameterType="com.zhph.common.kafka.model.TransMsgConsumerLog">
+		insert into C_TRANSMSG_CONSUMER_LOG (
+		<include refid="Base_Column_List" />
+		)values (
+		#{id,jdbcType=VARCHAR}
+		,#{msgPublisher,jdbcType=VARCHAR}
+		,#{firstTime,jdbcType=TIMESTAMP}
+		,#{msgName,jdbcType=VARCHAR}
+		,#{status,jdbcType=CHAR}
+		,#{retryCount,jdbcType=INTEGER}
+		,#{retryLimit,jdbcType=INTEGER}
+		,#{errorMsg,jdbcType=VARCHAR}
+		,#{updateTime,jdbcType=TIMESTAMP}
+		,#{consumerTime,jdbcType=TIMESTAMP}
+		,#{createdId,jdbcType=VARCHAR}
+		,#{callbackBody,jdbcType=VARCHAR}
+		)
+	</insert>
+
+	<insert id="addSelective" parameterType="com.zhph.common.kafka.model.TransMsgConsumerLog">
+		insert into C_TRANSMSG_CONSUMER_LOG (
+		<if test="id != null and '' != id">
+			ID
+		</if>
+		<if test="msgPublisher != null and '' != msgPublisher">
+			,MSG_PUBLISHER
+		</if>
+		<if test="firstTime != null">
+			,FIRST_TIME
+		</if>
+		<if test="msgName != null and '' != msgName">
+			,MSG_NAME
+		</if>
+		<if test="status != null and '' != status">
+			,STATUS
+		</if>
+		<if test="retryCount != null and '' != retryCount">
+			,RETRY_COUNT
+		</if>
+		<if test="retryLimit != null and '' != retryLimit">
+			,RETRY_LIMIT
+		</if>
+		<if test="errorMsg != null and '' != errorMsg">
+			,ERROR_MSG
+		</if>
+		<if test="updateTime != null">
+			,UPDATE_TIME
+		</if>
+		<if test="consumerTime != null">
+			,CONSUMER_TIME
+		</if>
+		<if test="createdId != null and '' != createdId">
+			,CREATED_ID
+		</if>
+		<if test="callbackBody != null and '' != callbackBody">
+			,CALLBACK_BODY
+		</if>
+		)values (
+		<if test="id != null and '' != id">
+			#{id,jdbcType=VARCHAR}
+		</if>
+		<if test="msgPublisher != null and '' != msgPublisher">
+			,#{msgPublisher,jdbcType=VARCHAR}
+		</if>
+		<if test="firstTime != null">
+			,#{firstTime,jdbcType=TIMESTAMP}
+		</if>
+		<if test="msgName != null and '' != msgName">
+			,#{msgName,jdbcType=VARCHAR}
+		</if>
+		<if test="status != null and '' != status">
+			,#{status,jdbcType=CHAR}
+		</if>
+		<if test="retryCount != null and '' != retryCount">
+			,#{retryCount,jdbcType=INTEGER}
+		</if>
+		<if test="retryLimit != null and '' != retryLimit">
+			,#{retryLimit,jdbcType=INTEGER}
+		</if>
+		<if test="errorMsg != null and '' != errorMsg">
+			,#{errorMsg,jdbcType=VARCHAR}
+		</if>
+		<if test="updateTime != null">
+			,#{updateTime,jdbcType=TIMESTAMP}
+		</if>
+		<if test="consumerTime != null">
+			,#{consumerTime,jdbcType=TIMESTAMP}
+		</if>
+		<if test="createdId != null and '' != createdId">
+			,#{createdId,jdbcType=VARCHAR}
+		</if>
+		<if test="callbackBody != null and '' != callbackBody">
+			,#{callbackBody,jdbcType=VARCHAR}
+		</if>
+		)
+	</insert>
+
+	<update id="update" parameterType="com.zhph.common.kafka.model.TransMsgConsumerLog">
+		update C_TRANSMSG_CONSUMER_LOG
+		set
+		ID= #{id,jdbcType=VARCHAR}
+		,MSG_PUBLISHER = #{msgPublisher,jdbcType=VARCHAR}
+		,FIRST_TIME = #{firstTime,jdbcType=TIMESTAMP}
+		,MSG_NAME = #{msgName,jdbcType=VARCHAR}
+		,STATUS = #{status,jdbcType=CHAR}
+		,RETRY_COUNT = #{retryCount,jdbcType=INTEGER}
+		,RETRY_LIMIT = #{retryLimit,jdbcType=INTEGER}
+		,ERROR_MSG = #{errorMsg,jdbcType=VARCHAR}
+		,UPDATE_TIME = #{updateTime,jdbcType=TIMESTAMP}
+		,CONSUMER_TIME = #{consumerTime,jdbcType=TIMESTAMP}
+		,CREATED_ID = #{createdId,jdbcType=VARCHAR}
+		,CALLBACK_BODY = #{callbackBody,jdbcType=VARCHAR}
+		where ID = #{id,jdbcType=VARCHAR}
+	</update>
+
+	<update id="updateSelective" parameterType="com.zhph.common.kafka.model.TransMsgConsumerLog">
+		update C_TRANSMSG_CONSUMER_LOG set
+		ID = #{id,jdbcType=VARCHAR}
+		<if test="id != null and '' != id">
+		</if>
+		<if test="msgPublisher != null and '' != msgPublisher">
+			,MSG_PUBLISHER = #{msgPublisher,jdbcType=VARCHAR}
+		</if>
+		<if test="firstTime != null">
+			,FIRST_TIME = #{firstTime,jdbcType=TIMESTAMP}
+		</if>
+		<if test="msgName != null and '' != msgName">
+			,MSG_NAME = #{msgName,jdbcType=VARCHAR}
+		</if>
+		<if test="status != null and '' != status">
+			,STATUS = #{status,jdbcType=CHAR}
+		</if>
+		<if test="retryCount != null and '' != retryCount">
+			,RETRY_COUNT = #{retryCount,jdbcType=INTEGER}
+		</if>
+		<if test="retryLimit != null and '' != retryLimit">
+			,RETRY_LIMIT = #{retryLimit,jdbcType=INTEGER}
+		</if>
+		<if test="errorMsg != null and '' != errorMsg">
+			,ERROR_MSG = #{errorMsg,jdbcType=VARCHAR}
+		</if>
+		<if test="updateTime != null">
+			,UPDATE_TIME = #{updateTime,jdbcType=TIMESTAMP}
+		</if>
+		<if test="consumerTime != null">
+			,CONSUMER_TIME = #{consumerTime,jdbcType=TIMESTAMP}
+		</if>
+		<if test="createdId != null and '' != createdId">
+			,CREATED_ID = #{createdId,jdbcType=VARCHAR}
+		</if>
+		<if test="callbackBody != null and '' != callbackBody">
+			,CALLBACK_BODY = #{callbackBody,jdbcType=VARCHAR}
+		</if>
+		where ID = #{id,jdbcType=VARCHAR}
+	</update>
+</mapper>

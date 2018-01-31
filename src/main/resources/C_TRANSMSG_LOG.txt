@@ -1,0 +1,69 @@
+-- Create table
+create table C_TRANSMSG_LOG
+(
+  ID            VARCHAR2(32) not null,
+  MSG_PUBLISHER VARCHAR2(64),
+  PUBLISH_TIME  TIMESTAMP(6),
+  MSG_NAME      VARCHAR2(64),
+  MSG_BODY5     VARCHAR2(1024),
+  STATUS        CHAR(2),
+  RETRY_COUNT   NUMBER,
+  RETRY_LIMIT   NUMBER,
+  ERROR_MSG     VARCHAR2(255),
+  UPDATE_TIME   TIMESTAMP(6),
+  MSG_TYPE      CHAR(2),
+  CONSUMER_TIME TIMESTAMP(6),
+  MSG_BODY1     VARCHAR2(4000),
+  MSG_BODY2     VARCHAR2(4000),
+  MSG_BODY3     VARCHAR2(4000),
+  MSG_BODY4     VARCHAR2(4000),
+  CREATED_ID    VARCHAR2(32)
+)
+tablespace USERS
+  pctfree 10
+  initrans 1
+  maxtrans 255
+  storage
+  (
+    initial 64
+    next 8
+    minextents 1
+    maxextents unlimited
+  );
+-- Add comments to the columns 
+comment on column C_TRANSMSG_LOG.MSG_PUBLISHER
+  is '消息业务ID';
+comment on column C_TRANSMSG_LOG.PUBLISH_TIME
+  is '发布时间';
+comment on column C_TRANSMSG_LOG.MSG_NAME
+  is '消息名称';
+comment on column C_TRANSMSG_LOG.MSG_BODY5
+  is '消息体';
+comment on column C_TRANSMSG_LOG.STATUS
+  is '消息状态：0删除 1待发送 2回滚成功 3回滚失败';
+comment on column C_TRANSMSG_LOG.RETRY_COUNT
+  is '重试次数';
+comment on column C_TRANSMSG_LOG.RETRY_LIMIT
+  is '重试最大次数限制';
+comment on column C_TRANSMSG_LOG.ERROR_MSG
+  is '错误消息';
+comment on column C_TRANSMSG_LOG.UPDATE_TIME
+  is '更新时间';
+comment on column C_TRANSMSG_LOG.MSG_TYPE
+  is '消息类型: 0消息队列 1http 2其他';
+comment on column C_TRANSMSG_LOG.CONSUMER_TIME
+  is '成功消费时间';
+comment on column C_TRANSMSG_LOG.MSG_BODY1
+  is '消息体';
+comment on column C_TRANSMSG_LOG.MSG_BODY2
+  is '消息体';
+comment on column C_TRANSMSG_LOG.MSG_BODY3
+  is '消息体';
+comment on column C_TRANSMSG_LOG.MSG_BODY4
+  is '消息体';
+comment on column C_TRANSMSG_LOG.CREATED_ID
+  is '创建用户ID';
+-- Create/Recreate primary, unique and foreign key constraints 
+alter table C_TRANSMSG_LOG
+  add constraint CREATED_ID_PK primary key (ID)
+ 

@@ -1,0 +1,42 @@
+-- Create table
+create table C_TRANSMSG_CONSUMER_LOG
+(
+  ID            VARCHAR2(32) not null,
+  MSG_PUBLISHER VARCHAR2(255),
+  FIRST_TIME    TIMESTAMP(6),
+  MSG_NAME      VARCHAR2(100),
+  STATUS        CHAR(2),
+  RETRY_COUNT   NUMBER,
+  RETRY_LIMIT   NUMBER,
+  ERROR_MSG     VARCHAR2(255),
+  UPDATE_TIME   TIMESTAMP(6),
+  CONSUMER_TIME TIMESTAMP(6),
+  CREATED_ID    VARCHAR2(64),
+  CALLBACK_BODY VARCHAR2(255)
+);
+-- Add comments to the columns 
+comment on column C_TRANSMSG_CONSUMER_LOG.MSG_PUBLISHER
+  is '消息业务ID';
+comment on column C_TRANSMSG_CONSUMER_LOG.FIRST_TIME
+  is '第一次消费时间';
+comment on column C_TRANSMSG_CONSUMER_LOG.MSG_NAME
+  is '消息名称';
+comment on column C_TRANSMSG_CONSUMER_LOG.STATUS
+  is '消息状态：0消费成功 1消费失败';
+comment on column C_TRANSMSG_CONSUMER_LOG.RETRY_COUNT
+  is '重试次数';
+comment on column C_TRANSMSG_CONSUMER_LOG.RETRY_LIMIT
+  is '重试最大次数限制';
+comment on column C_TRANSMSG_CONSUMER_LOG.ERROR_MSG
+  is '错误消息';
+comment on column C_TRANSMSG_CONSUMER_LOG.UPDATE_TIME
+  is '更新时间';
+comment on column C_TRANSMSG_CONSUMER_LOG.CONSUMER_TIME
+  is '成功消费时间';
+comment on column C_TRANSMSG_CONSUMER_LOG.CREATED_ID
+  is '创建用户ID';
+comment on column C_TRANSMSG_CONSUMER_LOG.CALLBACK_BODY
+  is '返回的消息体（用于自定义返回消息）';
+-- Create/Recreate primary, unique and foreign key constraints 
+alter table C_TRANSMSG_CONSUMER_LOG
+  add constraint CALLBACK_BODY_PK primary key (ID)
