@@ -58,8 +58,9 @@
 		where trim(status)=1
 		and retry_count &lt; retry_limit
 		<if test="msgType!=null">
-			and trim(msg_type)=#{msgType,jdbcType=VARCHAR}
+			and trim(msg_type)=#{msgType,jdbcType=VARCHAR} 
 		</if>
+		order by publish_time asc
 	</select>
 
 	<select id="listByCondition" resultMap="BaseResultMap"
