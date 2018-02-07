@@ -132,7 +132,18 @@ public class MQTransConsistenceProducerImpl implements MQTransConsistenceProduce
         }
     }
 
-    /**
+    @Override
+	public String producerSaveAndSendMsgLogNeedReturn(String topic, String msgBody, String busiNo, String callbackTopic,
+			int retryLimit, String createdId) {
+    	try {
+			this.producerSaveAndSendMsgLog(topic, msgBody, busiNo, callbackTopic, retryLimit, createdId);
+		} catch (Exception e) {
+			return "-1";
+		}
+		return busiNo;
+	}
+
+	/**
      * 消费者消费消息，处理带自定义返回值的消费结果，并回执成功消息
      *
      * @param msgLog
