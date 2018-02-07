@@ -82,15 +82,15 @@ public class ConsumerBusinessThread extends Thread {
     		//Set<String> topics = consumer.subscription();
     		//debug = (topics != null && topics.size()>0 && topics.contains("sc.replication.basic.addProductParam"));
     		if (debug)
-    			ZhphLogger.error("========================================当前Consumer为{}，当前线程ID为{}，准备poll消息，当前时间：{}",consumer.hashCode(),Thread.currentThread().getId(),
+    			ZhphLogger.debug("========================================当前Consumer为{}，当前线程ID为{}，准备poll消息，当前时间：{}",consumer.hashCode(),Thread.currentThread().getId(),
     					System.currentTimeMillis());
 	        ConsumerRecords<Object, Object> records = consumer.poll(100);
 	        if (debug)
-	        	ZhphLogger.error("========================================当前Consumer为{}，当前线程ID为{}，poll消息完毕，当前时间：{}",consumer.hashCode(),Thread.currentThread().getId(),
+	        	ZhphLogger.debug("========================================当前Consumer为{}，当前线程ID为{}，poll消息完毕，当前时间：{}",consumer.hashCode(),Thread.currentThread().getId(),
     					System.currentTimeMillis());
 	        if (records != null && records.count() > 0) {
 	        	if (debug)
-	        		ZhphLogger.error("========================================当前Consumer为{}，当前线程ID为{}，poll消息成功，当前时间：{}",consumer.hashCode(),Thread.currentThread().getId(),
+	        		ZhphLogger.debug("========================================当前Consumer为{}，当前线程ID为{}，poll消息成功，当前时间：{}",consumer.hashCode(),Thread.currentThread().getId(),
 	    					System.currentTimeMillis());
 				if (this.C_SimpleEcho.equals(this.consumerType) ||
 						this.C_MsgEcho.equals(this.consumerType))
@@ -215,7 +215,7 @@ public class ConsumerBusinessThread extends Thread {
                 }
             }
             if (debug)
-        		ZhphLogger.error("========================================当前Consumer为{}，当前线程ID为{}，消息ID为{}，topic为：{},消费消息完成，当前时间：{}",consumer.hashCode(),Thread.currentThread().getId(),
+        		ZhphLogger.debug("========================================当前Consumer为{}，当前线程ID为{}，消息ID为{}，topic为：{},消费消息完成，当前时间：{}",consumer.hashCode(),Thread.currentThread().getId(),
     					record.key().toString(),record.topic(),System.currentTimeMillis());
         }
     }

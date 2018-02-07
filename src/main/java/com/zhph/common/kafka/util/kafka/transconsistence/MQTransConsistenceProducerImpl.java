@@ -396,7 +396,7 @@ public class MQTransConsistenceProducerImpl implements MQTransConsistenceProduce
     private void sendMsg(TransMsgLog msgLog) throws RuntimeException {
         // 向消息队列发消息
         messageProducerPool.send(msgLog.getMsgName(), msgLog.getId(), msgLog.getMsgBody());
-        ZhphLogger.error("send message for msgId={} and msgname={}", msgLog.getId(), msgLog.getMsgName());
+        ZhphLogger.info("send message for msgId={} and msgname={}", msgLog.getId(), msgLog.getMsgName());
     }
 
     /**
