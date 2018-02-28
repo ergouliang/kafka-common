@@ -1,5 +1,6 @@
 package com.zhph.common.kafka.util.kafka.transconsistence;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -11,6 +12,7 @@ import com.zhph.common.kafka.service.mq.transconsistence.IMQConsumerSimpleCallba
 import com.zhph.common.kafka.util.GlobalUtil;
 import com.zhph.common.kafka.util.StringUtil;
 import org.apache.kafka.clients.consumer.Consumer;
+import org.springframework.util.StringUtils;
 
 import com.alibaba.fastjson.JSON;
 import com.zhph.common.kafka.constants.Constants;
@@ -362,7 +364,22 @@ public class MQTransConsistenceProducerImpl implements MQTransConsistenceProduce
         for (TransMsgLog log : logs) {
         	if (log.getRetryCount().intValue() >= log.getRetryLimit().intValue())
         		continue;
+            long nh = 1000 * 60 * 60;
+            Long hour = 0L;
+            Long subVal = 0L;
             try {
+	            //更新时间在一个小时内的推迟重试
+	        	if(!StringUtils.isEmpty(log.getUpdateTime())) {
+	        		subVal = new Date().getTime() - log.getUpdateTime().getTime();
+	        		hour = subVal/ nh;
+	        		if(hour.intValue() < 1) continue;
+	        	}
+	        	//推送时间在一个小时内推迟重试
+	        	if(!StringUtils.isEmpty(log.getPublishTime())) {
+	        		subVal = new Date().getTime() - log.getPublishTime().getTime();
+	        		hour = subVal / nh;
+	        		if(hour.intValue() < 1) continue;
+	        	}
                 sendMsg(log);
             } catch (RuntimeException e) {
                 e.printStackTrace();

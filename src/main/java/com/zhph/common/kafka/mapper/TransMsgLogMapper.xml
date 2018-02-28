@@ -55,12 +55,12 @@
 		select
 		<include refid="Base_Column_List" />
 		from c_transmsg_log l
-		where trim(status)=1
-		and retry_count &lt; retry_limit
+		where trim(l.status)=1
+		and l.retry_count &lt; l.retry_limit 
 		<if test="msgType!=null">
-			and trim(msg_type)=#{msgType,jdbcType=VARCHAR} 
+			and trim(l.msg_type)=#{msgType,jdbcType=VARCHAR} 
 		</if>
-		order by publish_time asc
+		order by l.publish_time asc
 	</select>
 
 	<select id="listByCondition" resultMap="BaseResultMap"
