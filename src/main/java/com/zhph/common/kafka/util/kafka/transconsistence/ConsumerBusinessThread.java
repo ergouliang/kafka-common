@@ -1,19 +1,33 @@
 package com.zhph.common.kafka.util.kafka.transconsistence;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+
+import javax.annotation.PostConstruct;
+import javax.annotation.PreDestroy;
 
 import com.zhph.common.kafka.exception.MsgStopRetryException;
 import com.zhph.common.kafka.model.TransMsgConsumerLog;
 import com.zhph.common.kafka.service.TransMsgConsumerLogService;
+import com.zhph.common.kafka.service.TransMsgLogService;
 import com.zhph.common.kafka.service.mq.transconsistence.IMQConsumerCallback;
+import com.zhph.common.kafka.service.mq.transconsistence.IMQConsumerCallbackBase;
+import com.zhph.common.kafka.service.mq.transconsistence.IMQConsumerMultipleCallback;
 import com.zhph.common.kafka.service.mq.transconsistence.IMQConsumerSimpleCallback;
 import com.zhph.common.kafka.util.StringUtil;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
 
 import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONArray;
+import com.alibaba.fastjson.JSONObject;
 import com.zhph.common.kafka.model.TransMsgLog;
 import com.zhph.common.kafka.util.log4j.ZhphLogger;
 
@@ -26,11 +40,12 @@ import com.zhph.common.kafka.util.log4j.ZhphLogger;
 public class ConsumerBusinessThread extends Thread {
 
     private final Consumer<Object, Object> consumer;
-    private final IMQConsumerSimpleCallback simpleAction;
-    private final IMQConsumerCallback action;
+    private final IMQConsumerCallbackBase action;
+//    private final IMQConsumerCallback action;
     private final String topic;
     private final MessageProducerPool messageProducerPool;
     private final TransMsgConsumerLogService transMsgConsumerLogService;
+    private final TransMsgLogService transMsgLogService;
     // 消费消息类型：C_SimpleEcho, C_MsgEcho, C_NonEcho
     private final String consumerType;
     // 消费消息成功后发送确认消息，消息体为消息ID
@@ -39,41 +54,37 @@ public class ConsumerBusinessThread extends Thread {
     public static final String C_MsgEcho = "C_MsgEcho";
     // 消费消息成功后不发送确认消息，如生产者消费MsgReply.SUCCESS，更改日志状态
     public static final String C_NonEcho = "C_NonEcho";
+ // 消费消息成功后不发送确认消息，如生产者消费MsgReply.SUCCESS，批量更改日志状态
+    public static final String C_Multiple_NonEcho = "C_Multiple_NonEcho";
+    
     private boolean debug = false;
-
-    public ConsumerBusinessThread(Consumer<Object, Object> vconsumer, IMQConsumerSimpleCallback vaction,
-            String vtopic, MessageProducerPool vmessageProducerPool, TransMsgConsumerLogService vTransMsgConsumerLogService, 
-            String vconsumerType) {
+    Long confirmAddTimeHashKey;
+    Long confirmHashKey;
+    private ConcurrentMap<Long, List<TransMsgLog>> confirmMessageMap;
+    private Long updateRetryMsgLogRate;
+    private Integer updateRetryMsgLogCounts;
+    
+    
+    public ConsumerBusinessThread(Consumer<Object, Object> vconsumer, IMQConsumerCallbackBase vaction,
+            String vtopic,Integer partition, MessageProducerPool vmessageProducerPool, TransMsgConsumerLogService vTransMsgConsumerLogService, TransMsgLogService vtransMsgLogService,
+            String vconsumerType,Long updateRetryMsgLogRate,Integer updateRetryMsgLogCounts) {
         if (vconsumer == null || vaction == null || vtopic == null || "".equals(vtopic)
                 || vconsumerType == null || "".equals(vconsumerType))
             throw new RuntimeException("所有参数都不能为空！");
-
-        this.consumer = vconsumer;
         
-        this.simpleAction = vaction;
-        this.action = null;
-        this.topic = vtopic;
-        this.messageProducerPool = vmessageProducerPool;
-        this.transMsgConsumerLogService = vTransMsgConsumerLogService;
-        this.consumerType = vconsumerType;
-        super.setName("Thread-"+vtopic);
-    }
-
-    public ConsumerBusinessThread(Consumer<Object, Object> vconsumer, IMQConsumerCallback vaction,
-            String vtopic, MessageProducerPool vmessageProducerPool,TransMsgConsumerLogService vTransMsgConsumerLogService,
-            String vconsumerType) {
-        if (vconsumer == null || vaction == null || vtopic == null || "".equals(vtopic)
-                || vconsumerType == null || "".equals(vconsumerType))
-            throw new RuntimeException("所有参数都不能为空！");
-
         this.consumer = vconsumer;
+        this.updateRetryMsgLogRate = updateRetryMsgLogRate;
+        this.updateRetryMsgLogCounts = updateRetryMsgLogCounts;
         this.action = vaction;
-        this.simpleAction = null;
         this.topic = vtopic;
         this.messageProducerPool = vmessageProducerPool;
         this.transMsgConsumerLogService = vTransMsgConsumerLogService;
+        this.transMsgLogService = vtransMsgLogService;
         this.consumerType = vconsumerType;
-        super.setName("Thread-"+vtopic);
+        super.setName("Thread-"+vtopic+"-"+partition);
+        confirmHashKey = Long.valueOf(super.getName().hashCode());
+        confirmAddTimeHashKey = confirmHashKey + new Date().getTime();
+        confirmMessageMap = new ConcurrentHashMap<Long, List<TransMsgLog>>(Collections.singletonMap(confirmAddTimeHashKey, new ArrayList<TransMsgLog>()));
     }
 
     @Override
@@ -88,15 +99,19 @@ public class ConsumerBusinessThread extends Thread {
 	        if (debug)
 	        	ZhphLogger.debug("========================================当前Consumer为{}，当前线程ID为{}，poll消息完毕，当前时间：{}",consumer.hashCode(),Thread.currentThread().getId(),
     					System.currentTimeMillis());
+	        
+	        checkTimeOutOfRetryRateAndDoAction(action);
 	        if (records != null && records.count() > 0) {
 	        	if (debug)
 	        		ZhphLogger.debug("========================================当前Consumer为{}，当前线程ID为{}，poll消息成功，当前时间：{}",consumer.hashCode(),Thread.currentThread().getId(),
 	    					System.currentTimeMillis());
-				if (this.C_SimpleEcho.equals(this.consumerType) ||
-						this.C_MsgEcho.equals(this.consumerType))
+				if (ConsumerBusinessThread.C_SimpleEcho.equals(this.consumerType) ||
+						ConsumerBusinessThread.C_MsgEcho.equals(this.consumerType))
 				    this.consumerBusiness(records, action);
-				else if (this.C_NonEcho.equals(this.consumerType))
-				    this.consumerBusinessNonEcho(records, simpleAction);
+				else if (ConsumerBusinessThread.C_NonEcho.equals(this.consumerType))
+				    this.consumerBusinessNonEcho(records, (IMQConsumerSimpleCallback)action);
+				else if (ConsumerBusinessThread.C_Multiple_NonEcho.equals(this.consumerType))
+					this.consumerMultipleBusinessNonEcho(records, (IMQConsumerMultipleCallback)action);
 	        }
         } catch (Throwable e) {
         	e.printStackTrace();
@@ -104,7 +119,7 @@ public class ConsumerBusinessThread extends Thread {
 		}
     }
 
-    /**
+	/**
      * 消费消息成功后发送确认消息，消息体为具体数据，供生产者处理
      *
      * @param records
@@ -118,12 +133,13 @@ public class ConsumerBusinessThread extends Thread {
             return;
 
         for (ConsumerRecord<Object, Object> record : records) {
+        	
         	// 消费者消费消息，成功后返回消息ID
             //消息体解包
             TransMsgLog log = this.decodeMsgBody(record);
             if (log == null) continue;
             log.setId(record.key() == null ? "" : record.key().toString());
-            
+            KafkaConsumer<Object, Object> kafkaConsumer = (KafkaConsumer<Object, Object>) this.consumer;
             Boolean success = false;
             Map<String, Object> result = null;
             String callbackBody = "{id:\""+log.getId()+"\",status:\"0\"}";
@@ -149,11 +165,11 @@ public class ConsumerBusinessThread extends Thread {
             	String errorMsg = null;
             	String status = "1";
 	            try {
-	            	if (this.C_SimpleEcho.equals(this.consumerType)){
-	            		success = ((IMQConsumerSimpleCallback)simpleAction).doConsumerBusiness(log.getMsgBody(), record.key().toString());
+	            	if (ConsumerBusinessThread.C_SimpleEcho.equals(this.consumerType)){
+	            		success = ((IMQConsumerSimpleCallback)action).doConsumerBusiness(log.getMsgBody(), record.key().toString());
 	            		if (success == null)
 	            			success = false;
-	            	}else if (this.C_MsgEcho.equals(this.consumerType)){
+	            	}else if (ConsumerBusinessThread.C_MsgEcho.equals(this.consumerType)){
 	            		result = ((IMQConsumerCallback)action).doConsumerBusiness(log.getMsgBody(), record.key().toString());
 	            		success = result!=null;
 	            		if (success)
@@ -184,13 +200,16 @@ public class ConsumerBusinessThread extends Thread {
             }else if ("0".equals(consumerLog.getStatus())){
             	success = true;
             }
-            
+            Integer partition = 0;
+            TransMsgLog tempLog = transMsgLogService.selectByPrimaryKey(log.getId());
+            if(tempLog == null) tempLog = new TransMsgLog();
             // 成功返回后，发送成功消息给生产者
             if (success) {
                 try {
 	            	//手工确认消费消息成功
 	            	commitSync(log.getId(), log.getMsgName());
-                    messageProducerPool.send(callbackTopics[0], log.getId(), callbackBody);
+	            	partition = getPartitionByNo(tempLog.getPartitionNo(),callbackTopics[0]);
+                    messageProducerPool.send(callbackTopics[0], log.getId(), callbackBody,partition);
                 } catch (Exception e) {
                     ZhphLogger.error("====================消费者发送确认消息出错！消息主题={},消息ID={},错误信息：{}", log.getCallbackTopicName(), log.getId(),
                             e.getMessage() + "," + e.getStackTrace());
@@ -207,8 +226,9 @@ public class ConsumerBusinessThread extends Thread {
             	try {
             		//手工确认消费消息成功
             		commitSync(log.getId(), log.getMsgName());
+            		partition = getPartitionByNo(tempLog.getPartitionNo(),callbackTopics[callbackTopics.length-1]);
 	                messageProducerPool.send(callbackTopics[callbackTopics.length-1],
-	                    		log.getId(), callbackBody);
+	                    		log.getId(), callbackBody,partition);
                 } catch (Exception e) {
                     ZhphLogger.error("====================消费者发送确认消息出错！消息主题={},消息ID={},错误信息：{}", log.getCallbackTopicName(), log.getId(),
                             e.getMessage() + "," + e.getStackTrace());
@@ -218,6 +238,15 @@ public class ConsumerBusinessThread extends Thread {
         		ZhphLogger.debug("========================================当前Consumer为{}，当前线程ID为{}，消息ID为{}，topic为：{},消费消息完成，当前时间：{}",consumer.hashCode(),Thread.currentThread().getId(),
     					record.key().toString(),record.topic(),System.currentTimeMillis());
         }
+    }
+    
+    
+    public Integer getPartitionByNo(String partitionNo,String topic) {
+    	 Integer partitions = messageProducerPool.partitionsForTopic(topic);
+    	 if(!StringUtil.isEmptyOrNull(partitionNo)) {
+    		 return Math.abs(partitionNo.hashCode()) % partitions;
+         }
+    	 return null;
     }
     
     private String getStackInfo(Throwable a){
@@ -353,4 +382,100 @@ public class ConsumerBusinessThread extends Thread {
             }
         }
     }
+    
+    /**
+     * 消费消息成功后组装确认消息批量发送
+     *
+     * @param records 消息记录
+     * @param action 消费消息的业务接口
+     * @param params 传递到业务接口内参数
+     * @throws RuntimeException
+     */
+    private void consumerMultipleBusinessNonEcho(ConsumerRecords<Object, Object> records,
+			IMQConsumerMultipleCallback action)  throws RuntimeException {
+    	
+    	 try {
+    		 List<TransMsgLog> msgList = null;
+    		 TransMsgLog log = null;
+    		 for(ConsumerRecord<Object, Object> record : records) {
+    			 if(record == null || record.value() == null) throw new RuntimeException("消息ID："+record.key().toString()+",消息体为空！");
+    			 
+    			 log = JSON.parseObject(record.value().toString(), TransMsgLog.class);
+    			 
+    			 if (!confirmMessageMap.containsKey(confirmAddTimeHashKey)) {
+    				Long newConfirmAddTimeHashKey = new Date().getTime() + confirmHashKey;
+					confirmAddTimeHashKey = newConfirmAddTimeHashKey;
+					confirmMessageMap.put(confirmAddTimeHashKey, new ArrayList<TransMsgLog>());
+    			 }
+    			 msgList = confirmMessageMap.get(confirmAddTimeHashKey);
+    			 msgList.add(log);
+    			 confirmMessageMap.put(confirmAddTimeHashKey, msgList);
+    		 }
+    		 checkCountsOutOfRetryCountsAndDoAction(action);
+    		 
+         } catch (Exception e) {
+             ZhphLogger.error("消费者批量更新处理消息出错！错误信息：{}", e.getMessage() + "," + e.getStackTrace());
+         }
+	}
+    
+    /**
+     * 检查回执批量更新时间是否超时
+     */
+	private void checkTimeOutOfRetryRateAndDoAction(IMQConsumerCallbackBase action) throws RuntimeException {
+		try {
+			if(action instanceof IMQConsumerMultipleCallback) {
+				Long newConfirmAddTimeHashKey = new Date().getTime() + confirmHashKey;
+				if (!confirmMessageMap.containsKey(confirmAddTimeHashKey)) {
+					confirmAddTimeHashKey = newConfirmAddTimeHashKey;
+					confirmMessageMap.put(confirmAddTimeHashKey, new ArrayList<TransMsgLog>());
+					return;
+				}
+				if (newConfirmAddTimeHashKey - confirmAddTimeHashKey <= updateRetryMsgLogRate)
+					return;
+				
+//				ZhphLogger.error("timeout:key：{},valSize:{},val{}", super.getName(),confirmMessageMap.get(confirmAddTimeHashKey).size(),JSON.toJSONString(confirmMessageMap.get(confirmAddTimeHashKey)));
+				doAction((IMQConsumerMultipleCallback)action);
+			}
+		} catch (Exception e) {
+			ZhphLogger.error("批量更新检查是否达到配置时间出错！错误信息：{}", e.getMessage() + "," + e.getStackTrace());
+		}
+	}
+	
+	/**
+     * 检查回执批量更新集合counts是否大于配置值
+     */
+	private void checkCountsOutOfRetryCountsAndDoAction(IMQConsumerMultipleCallback action) throws RuntimeException {
+		try {
+			if (!confirmMessageMap.containsKey(confirmAddTimeHashKey)) {
+				Long newConfirmAddTimeHashKey = new Date().getTime() + confirmHashKey;
+				confirmAddTimeHashKey = newConfirmAddTimeHashKey;
+				confirmMessageMap.put(confirmAddTimeHashKey, new ArrayList<TransMsgLog>());
+				return;
+			}
+//			ZhphLogger.debug("counts:key：{},valSize:{},val{}", super.getName(),confirmMessageMap.get(confirmAddTimeHashKey).size(),JSON.toJSONString(confirmMessageMap.get(confirmAddTimeHashKey)));
+			if(confirmMessageMap.get(confirmAddTimeHashKey) == null || confirmMessageMap.get(confirmAddTimeHashKey).size() < updateRetryMsgLogCounts)  return;
+			
+			doAction(action);
+		} catch (Exception e) {
+			ZhphLogger.error("批量更新检查是否达到配置时间出错！错误信息：{}", e.getMessage() + "," + e.getStackTrace());
+		}
+	}
+	
+    /**
+     * 批量更新频率或条数达到配置值执行发送消息
+     */
+	private void doAction(IMQConsumerMultipleCallback action) {
+		try {
+			List<TransMsgLog> msgList = confirmMessageMap.get(confirmAddTimeHashKey);
+			if (msgList != null && msgList.size() > 0) {
+				action.doConsumerBusiness(JSON.toJSONString(msgList));
+				// 手工确认消费消息成功
+				commitSync(null, null);
+			}
+			confirmAddTimeHashKey = new Date().getTime() + confirmHashKey;
+			confirmMessageMap = new ConcurrentHashMap<Long,List<TransMsgLog>>(Collections.singletonMap(confirmAddTimeHashKey, new ArrayList<TransMsgLog>()));
+		} catch (Exception e) {
+			ZhphLogger.error("消费者处理批量更新消息出错！,错误信息：{}", e.getMessage() + "," + e.getStackTrace());
+		}
+	}
 }

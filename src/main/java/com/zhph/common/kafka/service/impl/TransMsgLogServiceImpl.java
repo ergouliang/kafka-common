@@ -53,8 +53,12 @@ public class TransMsgLogServiceImpl implements TransMsgLogService {
         	splitMsgBody(log);
         logMapper.updateByPrimaryKeySelective(log);
     }
+    @Override
+	public void updateMsgLogOfBatch(List<TransMsgLog> logs) throws RuntimeException {
+    	logMapper.updateStatusOfBatch(logs);
+	}
     
-    /**
+	/**
      * 拆解MsgBody
      * @param log
      */
@@ -164,4 +168,10 @@ public class TransMsgLogServiceImpl implements TransMsgLogService {
 	public TransMsgLog selectByPrimaryKey(String id) {
 		return logMapper.selectByPrimaryKey(id);
 	}
+	@Override
+	public List<String> selectAllUnRetryTopics() {
+		return logMapper.selectAllUnRetryTopics();
+	}
+	
+	
 }

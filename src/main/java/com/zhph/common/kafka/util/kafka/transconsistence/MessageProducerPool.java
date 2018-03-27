@@ -2,12 +2,14 @@ package com.zhph.common.kafka.util.kafka.transconsistence;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.Future;
 
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
+import org.apache.kafka.common.PartitionInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,13 +50,13 @@ public class MessageProducerPool {
 
 	}
 	
-	public Future<RecordMetadata> send(String topic, String key, String message) throws RuntimeException{
+	public Future<RecordMetadata> send(String topic, String key, String message,Integer partition) throws RuntimeException{
 		/* 从对象池获取对象 */
 		if (pool==null)
 			throw new RuntimeException("kafka producer pool is null !!!");
 		Producer<Object, Object> producer = pool.getConnection();
 		try {
-			return producer.send(new ProducerRecord<Object, Object>(topic, key, message));
+			return producer.send(new ProducerRecord<Object, Object>(topic,partition, key, message));
 		} catch (Exception e) {
 			e.printStackTrace();
 			throw new RuntimeException(e);
@@ -62,6 +64,29 @@ public class MessageProducerPool {
 			if (producer!=null)
 				pool.returnConnection(producer);
 		}
+	}
+	
+	/**
+	 * 获取topic的partition数量
+	 * @param topic
+	 * @return
+	 */
+	public Integer partitionsForTopic(String topic) {
+		if (pool==null)
+			throw new RuntimeException("kafka producer pool is null !!!");
+		Producer<Object, Object> producer = pool.getConnection();
+		Integer partiton = 0;
+		try {
+			List<PartitionInfo> partitions = producer.partitionsFor(topic);
+			if(partitions != null) partiton = partitions.size();
+		} catch (Exception e) {
+			e.printStackTrace();
+			throw new RuntimeException(e);
+		} finally{
+			if (producer!=null)
+				pool.returnConnection(producer);
+		}
+		return partiton;
 	}
 	
 	public void close(){

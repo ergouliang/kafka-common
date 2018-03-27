@@ -81,6 +81,32 @@ public class TransMsgLog implements java.io.Serializable {
 	private String createdId;
 
 	private String callbackTopicName;
+	
+	/**
+	 * 分区
+	 */
+	private Integer partition;
+	
+	/**
+	 * 被分区编号，希望进入同一分区的业务号
+	 */
+	private String partitionNo;
+
+	public Integer getPartition() {
+		return partition;
+	}
+
+	public void setPartition(Integer partition) {
+		this.partition = partition;
+	}
+	
+	public String getPartitionNo() {
+		return partitionNo;
+	}
+
+	public void setPartitionNo(String partitionNo) {
+		this.partitionNo = partitionNo;
+	}
 
 	public String getId() {
 		return id;

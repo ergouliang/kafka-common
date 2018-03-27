@@ -20,4 +20,8 @@ public interface TransMsgLogMapper {
     int updateByPrimaryKeySelective(TransMsgLog record);
 
     int updateByPrimaryKey(TransMsgLog record);
+    
+    List<String> selectAllUnRetryTopics();
+    
+    int updateStatusOfBatch(List<TransMsgLog> list);
 }

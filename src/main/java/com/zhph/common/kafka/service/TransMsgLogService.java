@@ -42,10 +42,24 @@ public interface TransMsgLogService {
      * @throws RuntimeException
      */
     void updateMsgLog(final TransMsgLog log) throws RuntimeException;
+    
+    /**
+     * 批量更新日志信息
+     * @param logs
+     * @throws RuntimeException
+     */
+    void updateMsgLogOfBatch(final List<TransMsgLog> logs) throws RuntimeException;
+    
     /**
      * 根据ID查找记录
      * @param id
      * @return
      */
     TransMsgLog selectByPrimaryKey(String id);
+    
+    /**
+     * 获取所有未回执的topics
+     * @return
+     */
+    List<String> selectAllUnRetryTopics();
 }

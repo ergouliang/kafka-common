@@ -20,10 +20,11 @@ public interface MQTransConsistenceProducer {
      *            重试最大次数，传0自动设置成6次，重试超过最大次数还未成功，不再重复消费
      * @param createdId
      *            当前操作用户ID
+     * @param partitionNo 分区编号，多分区情况下为保证同一业务数据有序，需要指定相同的partitionNo
      * @throws RuntimeException
      */
 	void producerSaveAndSendMsgLog(String topic, String msgBody, String busiNo,
-            String callbackTopic, int retryLimit, String createdId) throws RuntimeException;
+            String callbackTopic, int retryLimit, String createdId,String partitionNo) throws RuntimeException;
 	
 	/**
      * 消息生产者保存单条日志，并发送消息(带返回值 成功返回 ：msgPublisher，失败返回 -1)
@@ -40,10 +41,12 @@ public interface MQTransConsistenceProducer {
      *            重试最大次数，传0自动设置成6次，重试超过最大次数还未成功，不再重复消费
      * @param createdId
      *            当前操作用户ID
+     * @param partitionNo 分区编号，多分区情况下为保证同一业务数据有序，需要指定相同的partitionNo
      * @throws RuntimeException
      */
 	String producerSaveAndSendMsgLogNeedReturn(String topic, String msgBody, String busiNo,
-            String callbackTopic, int retryLimit, String createdId);
+            String callbackTopic, int retryLimit, String createdId,String partitionNo);
+	
 	
 	/**
      * 消费者消费消息，处理带自定义返回值的消费结果，并回执成功消息

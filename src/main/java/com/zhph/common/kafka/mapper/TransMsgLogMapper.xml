@@ -21,6 +21,8 @@
 		<result column="MSG_BODY3" property="msgBody3" jdbcType="VARCHAR" />
 		<result column="MSG_BODY4" property="msgBody4" jdbcType="VARCHAR" />
 		<result column="CREATED_ID" property="createdId" jdbcType="VARCHAR" />
+		<result column="PARTITION" property="partition" jdbcType="INTEGER" />
+		<result column="PARTITION_NO" property="partitionNo" jdbcType="VARCHAR" />
 	</resultMap>
 	<sql id="Base_Column_List">
 		ID
@@ -40,6 +42,8 @@
 		,MSG_BODY3
 		,MSG_BODY4
 		,CREATED_ID
+		,PARTITION
+		,PARTITION_NO
 	</sql>
 
 	<select id="selectByPrimaryKey" resultMap="BaseResultMap"
@@ -61,6 +65,10 @@
 			and trim(l.msg_type)=#{msgType,jdbcType=VARCHAR} 
 		</if>
 		order by l.publish_time asc
+	</select>
+	<!-- and trim(t.retry_count) &lt; trim(t.retry_limit) -->
+	<select id="selectAllUnRetryTopics" resultType="java.lang.String">
+		select t.msg_name from c_transmsg_log t where t.status = 1  group by t.msg_name
 	</select>
 
 	<select id="listByCondition" resultMap="BaseResultMap"
@@ -120,6 +128,12 @@
 		<if test="createdId != null and '' != createdId">
 			and CREATED_ID = #{createdId,jdbcType=VARCHAR}
 		</if>
+		<if test="partition != null">
+			and PARTITION = #{partition,jdbcType=INTEGER}
+		</if>
+		<if test="partitionNo != null and '' != partitionNo">
+			and PARTITION_NO = #{partitionNo,jdbcType=VARCHAR}
+		</if>
 		<!-- <if test="orderFields != null and '' != orderFields"> order by ${orderFields} 
 			${order} </if> -->
 	</select>
@@ -151,6 +165,8 @@
 		,#{msgBody3,jdbcType=VARCHAR}
 		,#{msgBody4,jdbcType=VARCHAR}
 		,#{createdId,jdbcType=VARCHAR}
+		,#{partition,jdbcType=INTEGER}
+		,#{partitionNo,jdbcType=VARCHAR}
 		)
 	</insert>
 
@@ -207,6 +223,12 @@
 		<if test="createdId != null and '' != createdId">
 			,CREATED_ID
 		</if>
+		<if test="partition != null">
+			,PARTITION
+		</if>
+		<if test="partitionNo != null and '' != partitionNo">
+			,PARTITION_NO
+		</if>
 		)values (
 		<if test="id != null and '' != id">
 			#{id,jdbcType=VARCHAR}
@@ -259,6 +281,12 @@
 		<if test="createdId != null and '' != createdId">
 			,#{createdId,jdbcType=VARCHAR}
 		</if>
+		<if test="partition != null">
+			,#{partition,jdbcType=INTEGER}
+		</if>
+		<if test="partitionNo != null and '' != partitionNo">
+			,#{partitionNo,jdbcType=VARCHAR}
+		</if>
 		)
 	</insert>
 
@@ -293,6 +321,10 @@
 		#{msgBody4,jdbcType=VARCHAR}
 		,CREATED_ID =
 		#{createdId,jdbcType=VARCHAR}
+		,PARTITION =
+		#{partition,jdbcType=INTEGER}
+		,PARTITION_NO =
+		#{partitionNo,jdbcType=VARCHAR}
 		where ID = #{id,jdbcType=VARCHAR}
 	</update>
 
@@ -349,6 +381,29 @@
 		<if test="createdId != null and '' != createdId">
 			,CREATED_ID = #{createdId,jdbcType=VARCHAR}
 		</if>
+		<if test="partition != null">
+			,PARTITION = #{partition,jdbcType=INTEGER}
+		</if>
+		<if test="partitionNo != null and '' != partitionNo">
+			,PARTITION_NO = #{partitionNo,jdbcType=VARCHAR}
+		</if>
 		where ID = #{id,jdbcType=VARCHAR}
 	</update>
+	
+	
+	<update id="updateStatusOfBatch" parameterType="java.util.List">
+		update c_transmsg_log
+		<trim prefix="set" suffixOverrides=",">
+            <trim prefix="status =case" suffix="end,">
+                <foreach collection="list" item="item" index="index">
+                     when id=#{item.id} then #{item.status}
+                </foreach>
+            </trim>
+        </trim>
+        where id in
+        <foreach collection="list" index="index" item="item" separator="," open="(" close=")">
+            #{item.id}
+        </foreach>
+	</update>
+	
 </mapper>

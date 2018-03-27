@@ -19,7 +19,7 @@ public class ConsumerPool extends PoolBase<Consumer<Object, Object>> implements
 
 	private static final long serialVersionUID = -1506435964498488591L;
 
-	private static final String LOCAL_MODE = "192.168.7.204:9092,192.168.7.204:9093,192.168.7.204:9094";
+	private static final String LOCAL_MODE = "localhost:9092";
 
 	/**
 	 * 默认构造方法

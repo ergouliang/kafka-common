@@ -1,24 +1,27 @@
 package com.zhph.common.kafka.util.kafka.transconsistence;
 
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.annotation.PostConstruct;
 
-import com.zhph.common.kafka.service.TransMsgLogService;
-import com.zhph.common.kafka.service.mq.transconsistence.IMQConsumerSimpleCallback;
-import com.zhph.common.kafka.util.GlobalUtil;
-import com.zhph.common.kafka.util.StringUtil;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.springframework.util.StringUtils;
 
 import com.alibaba.fastjson.JSON;
 import com.zhph.common.kafka.constants.Constants;
 import com.zhph.common.kafka.model.TransMsgLog;
+import com.zhph.common.kafka.service.TransMsgLogService;
+import com.zhph.common.kafka.service.mq.transconsistence.IMQConsumerMultipleCallback;
+import com.zhph.common.kafka.service.mq.transconsistence.IMQConsumerSimpleCallback;
 import com.zhph.common.kafka.service.mq.transconsistence.MQTransConsistenceConsumer;
 import com.zhph.common.kafka.service.mq.transconsistence.MQTransConsistenceProducer;
+import com.zhph.common.kafka.util.GlobalUtil;
+import com.zhph.common.kafka.util.StringUtil;
 import com.zhph.common.kafka.util.log4j.ZhphLogger;
 
 
@@ -36,8 +39,40 @@ public class MQTransConsistenceProducerImpl implements MQTransConsistenceProduce
     private String producerPrefix;
     private final List<Consumer<Object, Object>> usedConsumers = new ArrayList<Consumer<Object, Object>>();
     private final int RETRY_LIMIT = 3;
+    
+    
+    private ConcurrentMap<String, AtomicInteger> subscribedRetryTopic  = new ConcurrentHashMap<>();
+    
+    public void registerRetry() {
+        try {
+        	List<String> unRetrytopics = transMsgLogService.selectAllUnRetryTopics();
+        	if(unRetrytopics != null && unRetrytopics.size() > 0) {
+        		for(String topic : unRetrytopics) {
+            		this.setSubscribedRetryTopic(topic);
+            	}
+        	}
+		} catch (Exception e) {
+			e.printStackTrace();
+			ZhphLogger.error("初始化注册未回执topic出错,错误信息{}", e.getMessage());
+		}
+    }
+    
+    /**
+     * 为每一个需要回执的生产者注册一个消费者
+     */
+	public void setSubscribedRetryTopic(String topic) {
+		if(!StringUtil.isEmptyOrNull(topic)) {
+			String replyTopic = this.producerPrefix + "." + topic + "." + Constants.TRANS_REPLY_TOPIC;
+			if(!subscribedRetryTopic.containsKey(replyTopic)) {
+	        	subscribedRetryTopic.put(replyTopic, new AtomicInteger(0));
+	        	this.registerConsumerByReplyTopic(replyTopic);
+	        }
+		}
+	}
+	
+	
 
-    public int getUpdateMsgLogRate() {
+	public int getUpdateMsgLogRate() {
         return updateMsgLogRate;
     }
 
@@ -110,13 +145,12 @@ public class MQTransConsistenceProducerImpl implements MQTransConsistenceProduce
      */
     @Override
     public void producerSaveAndSendMsgLog(final String topic, final String msgBody, final String busiNo,
-            final String callbackTopic, final int retryLimit, final String createdId) throws RuntimeException {
+            final String callbackTopic, final int retryLimit, final String createdId,String partitionNo) throws RuntimeException {
     	
-        TransMsgLog msgLog = this.createInfoOfMsgLog(topic, msgBody, busiNo, callbackTopic, retryLimit, createdId);
+        TransMsgLog msgLog = this.createInfoOfMsgLog(topic, msgBody, busiNo, callbackTopic, retryLimit, createdId,partitionNo);
         if (msgLog == null) {
             throw new RuntimeException("消息数据不完整");
         }
-
         // 记录日志
         try {
             transMsgLogService.saveMsgLog(msgLog);
@@ -127,7 +161,8 @@ public class MQTransConsistenceProducerImpl implements MQTransConsistenceProduce
 
         // 向消息队列发消息
         try {
-            messageProducerPool.send(msgLog.getMsgName(), msgLog.getId(), msgLog.getMsgBody());
+            messageProducerPool.send(msgLog.getMsgName(), msgLog.getId(), msgLog.getMsgBody(),msgLog.getPartition());
+            this.setSubscribedRetryTopic(topic);
         } catch (Exception e) {
             ZhphLogger.error("生产者向消息队列发送消息出错！消息ID={},消息主题={},错误信息：{}", msgLog.getId(), msgLog.getMsgName(), e.getCause());
             throw new RuntimeException(e);
@@ -136,9 +171,9 @@ public class MQTransConsistenceProducerImpl implements MQTransConsistenceProduce
 
     @Override
 	public String producerSaveAndSendMsgLogNeedReturn(String topic, String msgBody, String busiNo, String callbackTopic,
-			int retryLimit, String createdId) {
+			int retryLimit, String createdId,String partitionNo) {
     	try {
-			this.producerSaveAndSendMsgLog(topic, msgBody, busiNo, callbackTopic, retryLimit, createdId);
+			this.producerSaveAndSendMsgLog(topic, msgBody, busiNo, callbackTopic, retryLimit, createdId,partitionNo);
 		} catch (Exception e) {
 			return "-1";
 		}
@@ -182,7 +217,7 @@ public class MQTransConsistenceProducerImpl implements MQTransConsistenceProduce
 
             // 向消息队列发消息
             try {
-                messageProducerPool.send(ml.getMsgName(), ml.getId(), ml.getMsgBody());
+                messageProducerPool.send(ml.getMsgName(), ml.getId(), ml.getMsgBody(),ml.getPartition());
             } catch (Exception e) {
                 ZhphLogger.error("生产者向消息队列发送消息出错！消息ID={},消息主题={},错误信息：{}", ml.getId(), ml.getMsgName(), e.getCause());
                 throw new RuntimeException(e);
@@ -210,12 +245,12 @@ public class MQTransConsistenceProducerImpl implements MQTransConsistenceProduce
      *             生产者前缀属性producerPrefix没有配置
      */
     private TransMsgLog createInfoOfMsgLog(String topic, String msgBody, String busiNo, 
-    		String callbackTopic, int retryLimit, String createdId)
+    		String callbackTopic, int retryLimit, String createdId,String partitionNo)
             throws RuntimeException {
         if (topic == null || "".equals(topic) || msgBody == null || "".equals(msgBody)) {
             return null;
         }
-        String updateStatusTopic = this.producerPrefix + "." + Constants.TRANS_REPLY_TOPIC;
+        String updateStatusTopic = this.producerPrefix + "." + topic + "." + Constants.TRANS_REPLY_TOPIC;
         TransMsgLog msgLog = new TransMsgLog();
         msgLog.setMsgName(topic);
         if (! StringUtil.isEmptyOrNull(busiNo))
@@ -239,6 +274,13 @@ public class MQTransConsistenceProducerImpl implements MQTransConsistenceProduce
         msgLog.setCreatedId(createdId);
         String body = this.packageMsgBody(msgBody, msgLog.getCallbackTopicName(), msgLog.getRetryLimit(), msgLog.getMsgPublisher(), msgLog.getCreatedId());
         msgLog.setMsgBody(body);
+        msgLog.setPartitionNo(partitionNo);
+        Integer partitions = messageProducerPool.partitionsForTopic(topic);
+        if(!StringUtil.isEmptyOrNull(partitionNo)) {
+        	msgLog.setPartition(Math.abs(partitionNo.hashCode()) % partitions);
+        }else {
+        	if(partitions == 1) msgLog.setPartition(0);
+        }
         return msgLog;
     }
 
@@ -412,7 +454,8 @@ public class MQTransConsistenceProducerImpl implements MQTransConsistenceProduce
      */
     private void sendMsg(TransMsgLog msgLog) throws RuntimeException {
         // 向消息队列发消息
-        messageProducerPool.send(msgLog.getMsgName(), msgLog.getId(), msgLog.getMsgBody());
+        messageProducerPool.send(msgLog.getMsgName(), msgLog.getId(), msgLog.getMsgBody(),msgLog.getPartition());
+        this.setSubscribedRetryTopic(msgLog.getMsgName());
         ZhphLogger.info("send message for msgId={} and msgname={}", msgLog.getId(), msgLog.getMsgName());
     }
 
@@ -424,14 +467,20 @@ public class MQTransConsistenceProducerImpl implements MQTransConsistenceProduce
     @PostConstruct
     public void updateMsgLogStatusAfterGetReplyMessage() throws RuntimeException {
         String replyTopic = this.producerPrefix + "." + Constants.TRANS_REPLY_TOPIC;
-
-        mQTransConsistenceConsumer.consumerMessageEchoNone(replyTopic, new IMQConsumerSimpleCallback() {
-            @Override
-            public Boolean doConsumerBusiness(final String msgBody, final String msgId)
-                    throws RuntimeException {
-                return updateMsgLogStatus(msgBody);
-            }
-        }, updateMsgLogRate);
+        this.registerConsumerByReplyTopic(replyTopic);
+    }
+    
+    /**
+     * 动态订阅生产者接收确认消息的消费者
+     */
+    public void registerConsumerByReplyTopic(String topic) throws RuntimeException{
+    	mQTransConsistenceConsumer.consumerMultipleMessageEchoNone(topic, new IMQConsumerMultipleCallback() {
+			@Override
+			public Boolean doConsumerBusiness(String msgs) throws RuntimeException {
+				return updateMsgLogStatusOfBatch(msgs);
+			}
+		}, updateMsgLogRate);
+    	
     }
     
     /**
@@ -461,4 +510,25 @@ public class MQTransConsistenceProducerImpl implements MQTransConsistenceProduce
 
         return false;
     }
+    
+    /**
+     * 批量更新消息状态
+     * @param msgs
+     * @return
+     */
+    private Boolean updateMsgLogStatusOfBatch(final String msgs) {
+    	if(msgs == null || "".equals(msgs))
+    		return false;
+    	try {
+			List<TransMsgLog> logs = JSON.parseArray(msgs, TransMsgLog.class);
+			if(logs == null || logs.size() <= 0) throw new RuntimeException("批量更新状态时，得到的消息体为空！");
+			this.transMsgLogService.updateMsgLogOfBatch(logs);
+			return true;
+		} catch (Exception e) {
+			e.printStackTrace();
+			ZhphLogger.error("批量设置消息表状态时出错，消息体={},错误信息：{}", msgs, e.getMessage());
+		}
+    	return false;
+    }
+    
 }
