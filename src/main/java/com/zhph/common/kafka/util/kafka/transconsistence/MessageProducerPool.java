@@ -21,21 +21,33 @@ public class MessageProducerPool {
 		
 	private Logger logger = LoggerFactory.getLogger(MessageProducerPool.class);
 	private ProducerPool pool;
-	public MessageProducerPool(){
+	private Boolean productPoolSwitch;
+	
+	public Boolean getProductPoolSwitch() {
+		return productPoolSwitch;
+	}
+
+	public void setProductPoolSwitch(Boolean productPoolSwitch) {
+		this.productPoolSwitch = productPoolSwitch;
+	}
+
+	public void init() {
 		InputStream in = null;
 		Properties props = new Properties();
 		PoolConfig config = new PoolConfig();
 		try {
-			in = SerializeUtil.class.getClassLoader().getResourceAsStream("kafka-producer.properties");
-			props.load(in);
-			/* 对象池配置 */
-			config.setMaxTotal(Integer.parseInt(props.getProperty("pool.maxTotal","4")));
-			config.setMaxIdle(Integer.parseInt(props.getProperty("pool.maxIdle","5")));
-			config.setMaxWaitMillis(Integer.parseInt(props.getProperty("pool.maxWaitMillis","1000")));
-			config.setTestOnBorrow(Boolean.parseBoolean(props.getProperty("pool.maxWaitMillis","true")));
-
-			/* 初始化对象池 */
-			pool = new ProducerPool(config, props);
+			if(this.getProductPoolSwitch()) {
+				in = SerializeUtil.class.getClassLoader().getResourceAsStream("kafka-producer.properties");
+				props.load(in);
+				/* 对象池配置 */
+				config.setMaxTotal(Integer.parseInt(props.getProperty("pool.maxTotal","4")));
+				config.setMaxIdle(Integer.parseInt(props.getProperty("pool.maxIdle","5")));
+				config.setMaxWaitMillis(Integer.parseInt(props.getProperty("pool.maxWaitMillis","1000")));
+				config.setTestOnBorrow(Boolean.parseBoolean(props.getProperty("pool.maxWaitMillis","true")));
+	
+				/* 初始化对象池 */
+				pool = new ProducerPool(config, props);
+			}
 		} catch (IOException e) {
 			logger.error("kafka配置文件加载出错！");
 		} finally{
@@ -47,10 +59,14 @@ public class MessageProducerPool {
 				logger.error("kafka配置文件释放出错！");
 			}
 		}
-
 	}
 	
+	private MessageProducerPool(){}
+	
 	public Future<RecordMetadata> send(String topic, String key, String message,Integer partition) throws RuntimeException{
+		if(!this.getProductPoolSwitch()) {
+			throw new RuntimeException("send msg is failed,because the productPoolSwitch is closed!");
+		}
 		/* 从对象池获取对象 */
 		if (pool==null)
 			throw new RuntimeException("kafka producer pool is null !!!");
@@ -72,6 +88,9 @@ public class MessageProducerPool {
 	 * @return
 	 */
 	public Integer partitionsForTopic(String topic) {
+		if(!this.getProductPoolSwitch()) {
+			throw new RuntimeException("send msg is failed,because the productPoolSwitch is closed!");
+		}
 		if (pool==null)
 			throw new RuntimeException("kafka producer pool is null !!!");
 		Producer<Object, Object> producer = pool.getConnection();

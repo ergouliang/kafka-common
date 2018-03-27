@@ -18,21 +18,32 @@ public class MessageConsumerPool {
 	
 	private Logger logger = LoggerFactory.getLogger(MessageConsumerPool.class);
 	private ConsumerPool pool;
+	private Boolean consumerPoolSwitch;
 	
-	public MessageConsumerPool(){
+	public Boolean getConsumerPoolSwitch() {
+		return consumerPoolSwitch;
+	}
+
+	public void setConsumerPoolSwitch(Boolean consumerPoolSwitch) {
+		this.consumerPoolSwitch = consumerPoolSwitch;
+	}
+
+	public void init() {
 		InputStream in = null;
 		Properties props = new Properties();
 		PoolConfig config = new PoolConfig();
 		try {
-			in = SerializeUtil.class.getClassLoader().getResourceAsStream("kafka-consumer.properties");
-			props.load(in);
-		     /* 对象池配置 */
-			config.setMaxTotal(Integer.parseInt(props.getProperty("pool.maxTotal","4")));
-			config.setMaxIdle(Integer.parseInt(props.getProperty("pool.maxIdle","5")));
-			config.setMaxWaitMillis(Integer.parseInt(props.getProperty("pool.maxWaitMillis","1000")));
-			config.setTestOnBorrow(Boolean.parseBoolean(props.getProperty("pool.maxWaitMillis","true")));
-			/* 初始化对象池 */
-			pool = new ConsumerPool(config, props);
+			if(this.getConsumerPoolSwitch()) {
+				in = SerializeUtil.class.getClassLoader().getResourceAsStream("kafka-consumer.properties");
+				props.load(in);
+			     /* 对象池配置 */
+				config.setMaxTotal(Integer.parseInt(props.getProperty("pool.maxTotal","4")));
+				config.setMaxIdle(Integer.parseInt(props.getProperty("pool.maxIdle","5")));
+				config.setMaxWaitMillis(Integer.parseInt(props.getProperty("pool.maxWaitMillis","1000")));
+				config.setTestOnBorrow(Boolean.parseBoolean(props.getProperty("pool.maxWaitMillis","true")));
+				/* 初始化对象池 */
+				pool = new ConsumerPool(config, props);
+			}
 		} catch (IOException e) {
 			logger.error("kafka配置文件加载出错！");
 		} catch (Exception e) {
@@ -46,7 +57,9 @@ public class MessageConsumerPool {
 				logger.error("kafka配置文件释放出错！");
 			}
 		}
-
+	}
+	
+	private MessageConsumerPool(){
 	}
 		
 	/**
@@ -54,6 +67,9 @@ public class MessageConsumerPool {
 	 * @throws RuntimeException
 	 */
 	public ConsumerRecords<Object, Object> subscribe(String topic) throws RuntimeException{
+		if(!this.getConsumerPoolSwitch()) {
+			throw new RuntimeException("the consumerPoolSwitch is closed!");
+		}
 		/* 从对象池获取对象 */
 		if (pool==null)
 			throw new RuntimeException("kafka consumer pool is null !!!");

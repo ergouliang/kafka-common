@@ -146,7 +146,7 @@ public class MQTransConsistenceProducerImpl implements MQTransConsistenceProduce
     @Override
     public void producerSaveAndSendMsgLog(final String topic, final String msgBody, final String busiNo,
             final String callbackTopic, final int retryLimit, final String createdId,String partitionNo) throws RuntimeException {
-    	
+    	validateSwitchState();
         TransMsgLog msgLog = this.createInfoOfMsgLog(topic, msgBody, busiNo, callbackTopic, retryLimit, createdId,partitionNo);
         if (msgLog == null) {
             throw new RuntimeException("消息数据不完整");
@@ -171,7 +171,8 @@ public class MQTransConsistenceProducerImpl implements MQTransConsistenceProduce
 
     @Override
 	public String producerSaveAndSendMsgLogNeedReturn(String topic, String msgBody, String busiNo, String callbackTopic,
-			int retryLimit, String createdId,String partitionNo) {
+			int retryLimit, String createdId,String partitionNo) throws RuntimeException{
+    	validateSwitchState();
     	try {
 			this.producerSaveAndSendMsgLog(topic, msgBody, busiNo, callbackTopic, retryLimit, createdId,partitionNo);
 		} catch (Exception e) {
@@ -196,6 +197,7 @@ public class MQTransConsistenceProducerImpl implements MQTransConsistenceProduce
      */
     @Override
     public void producerSaveAndSendMultiMsgLog(final List<TransMsgLog> msgLog) throws RuntimeException {
+    	validateSwitchState();
         if (msgLog == null || msgLog.size() == 0) {
             throw new RuntimeException("消息数据为空");
         }
@@ -398,6 +400,13 @@ public class MQTransConsistenceProducerImpl implements MQTransConsistenceProduce
      * 轮训检查没有处理成功的消息日志，重新发送消息到消息队列
      */
     public void checkMsgLogAndSendMsg() {
+    	
+    	try {
+			validateSwitchState();
+		} catch (RuntimeException e1) {
+			ZhphLogger.error(e1.getMessage());
+			return;
+		}
         // 得到待发送或待回滚的msgLog
         List<TransMsgLog> logs = transMsgLogService.selectMsgOfNeedSend("0");
         if (logs == null || logs.size() == 0)
@@ -531,4 +540,12 @@ public class MQTransConsistenceProducerImpl implements MQTransConsistenceProduce
     	return false;
     }
     
+    private void validateSwitchState() throws RuntimeException{
+    	if (messageProducerPool==null)
+			throw new RuntimeException("kafka producer pool is null !!!");
+    	
+    	if(!messageProducerPool.getProductPoolSwitch()) {
+			throw new RuntimeException("send msg is failed,because the productPoolSwitch is closed!");
+		}
+    }
 }

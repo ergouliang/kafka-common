@@ -41,6 +41,7 @@ public class MQTransConsistenceConsumerImpl implements MQTransConsistenceConsume
     private final ScheduledExecutorService executors = Executors.newScheduledThreadPool(60);
     private Long updateRetryMsgLogRate;
     private Integer updateRetryMsgLogCounts;
+    private Boolean consumerSwitch;
     
     /**
      * 得到消费者连接池
@@ -69,7 +70,13 @@ public class MQTransConsistenceConsumerImpl implements MQTransConsistenceConsume
         this.messageProducerPool = messageProducerPool;
     }
     
-    public TransMsgConsumerLogService getTransMsgConsumerLogService() {
+    public Boolean getConsumerSwitch() {
+		return consumerSwitch;
+	}
+	public void setConsumerSwitch(Boolean consumerSwitch) {
+		this.consumerSwitch = consumerSwitch;
+	}
+	public TransMsgConsumerLogService getTransMsgConsumerLogService() {
 		return transMsgConsumerLogService;
 	}
 	public void setTransMsgConsumerLogService(TransMsgConsumerLogService transMsgConsumerLogService) {
@@ -159,10 +166,13 @@ public class MQTransConsistenceConsumerImpl implements MQTransConsistenceConsume
     private void consumerMessageCommon(final String topic, final Object action, final long rate,
             final String consumerType) throws RuntimeException {
         if (topic == null || "".equals(topic)) {
-            logger.error("====================property topic of message is empty !!!");
+            logger.error("property topic of message is empty !!!");
             throw new RuntimeException("property topic is empty !!!");
         }
-        
+        if(!this.getConsumerSwitch()) {
+        	logger.error("register consumer is failed by topic : {} ,because the consumerSwitch is closed!",topic);
+        	return;
+        }
         Consumer<Object, Object> consumer = messageConsumerPool.getConsumer();
         if (consumer == null)
             return;

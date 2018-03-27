@@ -45,7 +45,7 @@ public interface MQTransConsistenceProducer {
      * @throws RuntimeException
      */
 	String producerSaveAndSendMsgLogNeedReturn(String topic, String msgBody, String busiNo,
-            String callbackTopic, int retryLimit, String createdId,String partitionNo);
+            String callbackTopic, int retryLimit, String createdId,String partitionNo) throws RuntimeException;
 	
 	
 	/**
