@@ -139,7 +139,6 @@ public class ConsumerBusinessThread extends Thread {
             TransMsgLog log = this.decodeMsgBody(record);
             if (log == null) continue;
             log.setId(record.key() == null ? "" : record.key().toString());
-            KafkaConsumer<Object, Object> kafkaConsumer = (KafkaConsumer<Object, Object>) this.consumer;
             Boolean success = false;
             Map<String, Object> result = null;
             String callbackBody = "{id:\""+log.getId()+"\",status:\"0\"}";
